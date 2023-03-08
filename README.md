@@ -1,0 +1,1 @@
+## Cellular Automata written in Python and inspired by Conway's Game of Life
