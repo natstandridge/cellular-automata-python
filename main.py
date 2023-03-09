@@ -2,7 +2,28 @@ import pygame
 import hid
 import random
 
+class Pointer():
+    ''' Represents a yellow square that can be moved around the grid to place and remove squares. '''
+    def __init__(self, x, y):
+        self.image = pygame.image.load('pointer.png')
+        self.x = x
+        self.y = y
+
+    def draw(self, screen):
+        screen.blit(self.image, (self.x, self.y))
+
+    def move(self, direction):
+        if direction == 'Right':
+            self.x += 1
+        if direction == 'Left':
+            self.x -= 1
+        if direction == 'Up':
+            self.y -= 1
+        if direction == 'Down':
+            self.y += 1
+
 class Simulation:
+    ''' The game class that keeps track of the grid, the clock, and checking the grid against the rules. '''
     def __init__(self, WIN_SIZE=(750,750), SCALE_DIVISOR=75, INIT_WEIGHT=3):
         self.WIN_SIZE = WIN_SIZE ## sets window resolution
         self.SCALE_DIVISOR = SCALE_DIVISOR ## sets the number of squares wide and tall the grid is
@@ -12,7 +33,7 @@ class Simulation:
 
         self.pygame_flags = pygame.SCALED | pygame.RESIZABLE ## flags for display.set_mode
         self.clock = pygame.time.Clock()
-        self.grid_display = pygame.display.set_mode((WIN_SIZE[0], WIN_SIZE[1]), self.pygame_flags, vsync=1)
+        self.screen = pygame.display.set_mode((WIN_SIZE[0], WIN_SIZE[1]), self.pygame_flags, vsync=1)
 
         ## pygame setup
         pygame.init()
@@ -20,18 +41,16 @@ class Simulation:
         pygame.display.get_surface().fill((175, 175, 175))  ## draws a gray background
 
     def draw_square(self, x, y, color):
-        pygame.draw.rect(self.grid_display, color, [x, y, self.SQUARE_WIDTH, self.SQUARE_HEIGHT])
+        pygame.draw.rect(self.screen, color, [x, y, self.SQUARE_WIDTH, self.SQUARE_HEIGHT])
 
     def draw_grid(self, matrix):
 
-        y = 0 
+        y = 0
         for row in matrix:
             x = 0
             for square in row:
                 if square == 0:
                     self.draw_square(x, y, (0, 0, 0))             ## draw black square if 0
-                elif square == 2:
-                    self.draw_square(x, y, (255, 255, 0))         ## draw yellow where pointer currently pointing
                 else:
                     self.draw_square(x, y, (255, 255, 255))       ## draw white square if 1
 
@@ -94,7 +113,6 @@ class Simulation:
     def main(self):
         ALIVE_SQUARES = self.INIT_WEIGHT
         DEAD_SQUARES = 100 - self.INIT_WEIGHT
-        pointer_loc = [0,0]
 
         matrix = [[int(random.choices([0,1], weights=[DEAD_SQUARES, ALIVE_SQUARES])[0]) for _ in range(100)] for _ in range(100)] ## int()[0] is needed because .choices() returns nums in single-item list
 
@@ -106,55 +124,35 @@ class Simulation:
                 gamepad.set_nonblocking(True)
                 print(f"Found gamepad named {device['product_string']}.")
         
-        
+        player = Pointer(0, 0)
         looping = True
         while looping:
 
             report = gamepad.read(128)
-            last_pointer_loc = pointer_loc
-            for row_index, row in enumerate(matrix): ## checking through matrix to add yellow square at pointer_loc
-
-                for item_index, item in enumerate(matrix[row_index]):
-
-                    if row_index == pointer_loc[0] and item_index == pointer_loc[1]:
-
-                        last_pointer_loc_val = matrix[pointer_loc[0]][pointer_loc[1]]
-                        matrix[last_pointer_loc[0]][last_pointer_loc[1]] = last_pointer_loc_val
-                        print(last_pointer_loc_val)
-
-                        matrix[row_index][item_index] = 2 ## set pointer_loc to 2 to be painted yellow
-
-                        self.draw_grid(matrix)  ## redraw grid with new values
-                        pygame.display.update() ## update display
-
 
             if report:
                 con_state = self.io_check(report)
 
-                if pointer_loc[0] < 0:
-                    pointer_loc[0] = 0
-                if pointer_loc[1] < 0:
-                    pointer_loc[1] = 0
-
                 match con_state:
                     case 'Right':
                         print("Right")
-                        pointer_loc[1] += 1
+                        player.move('Right')
                     case 'Left':
                         print("Left")
-                        pointer_loc[1] -= 1
+                        player.move('Left')
                     case 'Up':
                         print("Up")
-                        pointer_loc[0] -= 1
+                        player.move('Up')
                     case 'Down':
                         print("Down")
-                        pointer_loc[0] += 1
+                        player.move('Down')
                     case 'A':
                         print("A")
-                        self.draw_square(pointer_loc[0], pointer_loc[1], (255, 255, 255)) ## add white square at pointer_loc if applicable
+                         ## add white square/1 on matrix if applicable
                     case 'B':
                         print("B")
-                        self.draw_square(pointer_loc[0], pointer_loc[1], (0, 0, 0)) ## add black square at pointer_loc 
+                        ## add black square/0 at pointer_loc 
+
        
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -162,8 +160,11 @@ class Simulation:
 
             ## matrix = rule_check(matrix) UNCOMMENT WHEN RULE_CHECK IS COMPLETE
             self.draw_grid(matrix)
+            player.draw(self.screen)
             pygame.display.update()          ## update display
             self.clock.tick(60)              ## set framerate
+
+
 
 if __name__ == '__main__':
     sim = Simulation()
