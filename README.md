@@ -5,5 +5,6 @@ TODO:
         - Likely will need to use transforms https://coderslegacy.com/python/how-to-resize-an-image-in-pygame/
         - May have to switch Pointer back to inheriting from Simulation
     2. Get A/B working to place/remove white squares
-    3. Get alternate keyboard controls working if controller is not detected
-    4. Test rules and expand on them as needed
+    3. Add pause button on Start or Select
+    4. Get alternate keyboard controls working if controller is not detected
+    5. Test rules and expand on them as needed

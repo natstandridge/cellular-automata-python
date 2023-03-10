@@ -2,49 +2,26 @@ import pygame
 import hid
 import random
 
-class Pointer():
-    ''' Represents a yellow square that can be moved around the grid to place and remove squares. '''
-    def __init__(self, x, y):
-        self.image = pygame.image.load('pointer.png')
-        self.x = x
-        self.y = y
-
-    def draw(self, screen):
-        screen.blit(self.image, (self.x, self.y))
-
-    def move(self, direction):
-        if direction == 'Right':
-            self.x += 1
-        if direction == 'Left':
-            self.x -= 1
-        if direction == 'Up':
-            self.y -= 1
-        if direction == 'Down':
-            self.y += 1
+WIN_SIZE = (750, 750) ## sets window resolution
+INIT_WEIGHT = 3 ## percent of squares that are alive on start
+SCALE_DIVISOR = 75 ## sets the number of squares wide and tall the grid is
+SQUARE_WIDTH = int(WIN_SIZE[0]/SCALE_DIVISOR)
+SQUARE_HEIGHT = int(WIN_SIZE[1]/SCALE_DIVISOR)
 
 class Simulation:
     ''' The game class that keeps track of the grid, the clock, and checking the grid against the rules. '''
-    def __init__(self, WIN_SIZE=(750,750), SCALE_DIVISOR=75, INIT_WEIGHT=3):
-        self.WIN_SIZE = WIN_SIZE ## sets window resolution
-        self.SCALE_DIVISOR = SCALE_DIVISOR ## sets the number of squares wide and tall the grid is
-        self.INIT_WEIGHT = INIT_WEIGHT ## percent of squares that are alive on start
-        self.SQUARE_WIDTH = int(self.WIN_SIZE[0]/self.SCALE_DIVISOR)
-        self.SQUARE_HEIGHT = int(self.WIN_SIZE[1]/self.SCALE_DIVISOR)
-
+    def __init__(self):
         self.pygame_flags = pygame.SCALED | pygame.RESIZABLE ## flags for display.set_mode
         self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((WIN_SIZE[0], WIN_SIZE[1]), self.pygame_flags, vsync=1)
-
-        ## pygame setup
         pygame.init()
         pygame.display.set_caption('Cellular Automata Python')
         pygame.display.get_surface().fill((175, 175, 175))  ## draws a gray background
 
     def draw_square(self, x, y, color):
-        pygame.draw.rect(self.screen, color, [x, y, self.SQUARE_WIDTH, self.SQUARE_HEIGHT])
+        pygame.draw.rect(self.screen, color, [x, y, SQUARE_WIDTH, SQUARE_HEIGHT])
 
     def draw_grid(self, matrix):
-
         y = 0
         for row in matrix:
             x = 0
@@ -54,8 +31,8 @@ class Simulation:
                 else:
                     self.draw_square(x, y, (255, 255, 255))       ## draw white square if 1
 
-                x += self.SQUARE_WIDTH                            ## move right by SQUARE_WIDTH
-            y += self.SQUARE_HEIGHT                               ## move down by SQUARE_HEIGHT
+                x += SQUARE_WIDTH                            ## move right by SQUARE_WIDTH
+            y += SQUARE_HEIGHT                               ## move down by SQUARE_HEIGHT
 
     def rule_check(self, matrix):
         ''' Check entire grid and return updated grid based on the rules. 
@@ -111,8 +88,8 @@ class Simulation:
             return('Start')
 
     def main(self):
-        ALIVE_SQUARES = self.INIT_WEIGHT
-        DEAD_SQUARES = 100 - self.INIT_WEIGHT
+        ALIVE_SQUARES = INIT_WEIGHT
+        DEAD_SQUARES = 100 - INIT_WEIGHT
 
         matrix = [[int(random.choices([0,1], weights=[DEAD_SQUARES, ALIVE_SQUARES])[0]) for _ in range(100)] for _ in range(100)] ## int()[0] is needed because .choices() returns nums in single-item list
 
@@ -125,6 +102,7 @@ class Simulation:
                 print(f"Found gamepad named {device['product_string']}.")
         
         player = Pointer(0, 0)
+        player.resize()
         looping = True
         while looping:
 
@@ -153,7 +131,6 @@ class Simulation:
                         print("B")
                         ## add black square/0 at pointer_loc 
 
-       
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     looping = False
@@ -164,7 +141,30 @@ class Simulation:
             pygame.display.update()          ## update display
             self.clock.tick(60)              ## set framerate
 
+class Pointer(Simulation):
+    ''' Represents a yellow square that can be moved around the grid to place and remove squares. '''
+    def __init__(self, x, y):
+        self.image = pygame.image.load('pointer.png')
+        self.x = x
+        self.y = y
 
+    def resize(self):
+        width = self.image.get_rect().width
+        height = self.image.get_rect().height
+        self.image = pygame.transform.scale(self.image, (width*SQUARE_WIDTH, height*SQUARE_HEIGHT)) ## transforms image to fit with grid
+
+    def draw(self, screen):
+        screen.blit(self.image, (self.x, self.y))
+
+    def move(self, direction):
+        if direction == 'Right':
+            self.x += SQUARE_WIDTH
+        if direction == 'Left':
+            self.x -= SQUARE_WIDTH
+        if direction == 'Up':
+            self.y -= SQUARE_HEIGHT
+        if direction == 'Down':
+            self.y += SQUARE_HEIGHT
 
 if __name__ == '__main__':
     sim = Simulation()
