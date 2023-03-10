@@ -2,8 +2,11 @@ import pygame
 import hid
 import random
 
+FPS = 6
 WIN_SIZE = (750, 750) ## sets window resolution
 INIT_WEIGHT = 3 ## percent of squares that are alive on start
+ALIVE_SQUARES = INIT_WEIGHT
+DEAD_SQUARES = 100 - INIT_WEIGHT
 SCALE_DIVISOR = 75 ## sets the number of squares wide and tall the grid is
 SQUARE_WIDTH = int(WIN_SIZE[0]/SCALE_DIVISOR)
 SQUARE_HEIGHT = int(WIN_SIZE[1]/SCALE_DIVISOR)
@@ -21,7 +24,21 @@ class Simulation:
     def draw_square(self, x, y, color):
         pygame.draw.rect(self.screen, color, [x, y, SQUARE_WIDTH, SQUARE_HEIGHT])
 
-    def draw_grid(self, matrix):
+    def create_grid(self):
+        matrix = [[int(random.choices([0,1], weights=[DEAD_SQUARES, ALIVE_SQUARES])[0]) for _ in range(100)] for _ in range(100)] ## int()[0] is needed because .choices() returns nums in single-item list
+        return(matrix)
+
+    def draw_grid(self, matrix, pointer_x=None, pointer_y=None, mode=None, modify=False):
+        ''' Draws the grid and takes in pointer_loc to add or remove squares if modify is True and mode is passed (create or remove). '''
+
+        if modify:
+            if mode == 'create':
+                matrix[pointer_y][pointer_x] = 1
+            elif mode == 'remove':
+                matrix[pointer_y][pointer_x] = 0
+            else:
+                pass
+            
         y = 0
         for row in matrix:
             x = 0
@@ -42,20 +59,48 @@ class Simulation:
                 2. Any white square that has at least one other white square left, right, above, or below it will duplicate
                 3. Any square that is able to duplicate will have the extra square added at its diagonals
         '''
+        left, above, right, below = None, None, None, None ## initialize variables for neighbors
         for row_index, row in enumerate(matrix):
             if 1 not in row: ## skip any row that is all 0
                 continue
             for item_index, item in enumerate(matrix[row_index]):
                 if item != 0: ## only check neighbors if square is alive
-                    try:
-                        ## check the neighbors of the item here
-                        if item_index != 0: ## keep the item_index from going negative and picking the wrong index
-                            above = matrix[item_index - 1][item_index]
-                            left = matrix[item_index][item_index - 1]
-                        right = matrix[item_index][item_index + 1]
-                        below = matrix[item_index + 1][item_index]
+                    if item_index != 0:
+                        left = matrix[row_index][item_index - 1]
+                    if row_index != 0:
+                        above = matrix[row_index - 1][item_index]
+                    if item_index < len(matrix[0]) - 1:
+                        right = matrix[row_index][item_index + 1]
+                    if row_index < len(matrix) - 1:
+                        below = matrix[row_index + 1][item_index]
 
-                        ## do the changes to the matrix here based on above, left, right, and below
+                    ## do the changes to the matrix here based on above, left, right, and below
+                    try:
+                        if left and above and right and below:
+                            ## all neighbors - this doubles any crosses
+                            matrix[row_index+2][item_index] = 0
+                            matrix[row_index-2][item_index] = 1
+                            matrix[row_index][item_index+2] = 0
+                            matrix[row_index][item_index-2] = 1
+
+                        elif left and right:
+                            matrix[row_index+1][item_index+1] = 1
+                            matrix[row_index+1][item_index-1] = 0
+                            matrix[row_index-1][item_index+1] = 1
+                            matrix[row_index-1][item_index-1] = 0
+
+                        elif above and below:
+                            matrix[row_index+1][item_index+1] = 1
+                            matrix[row_index-1][item_index-1] = 1
+
+                        elif above or below:
+                            matrix[row_index][item_index+1] = 1
+                            matrix[row_index][item_index+1] = 0
+                            matrix[row_index-1][item_index] = 1
+                            matrix[row_index-1][item_index] = 1
+                        else:
+                            ## no neighbors causes square to die
+                            matrix[row_index][item_index] = 0
 
                     except IndexError:
                         pass
@@ -72,26 +117,24 @@ class Simulation:
         if report[1] == 1:      ## B button
             return('B')
 
-        if report[3] == 6:      ## Left on D-pad pressed
-            return('Left')
+        if report[3] == 6:      ## left on D-pad pressed
+            return('left')
 
-        if report[3] == 2:      ## Right on D-pad pressed
-            return('Right')
+        if report[3] == 2:      ## right on D-pad pressed
+            return('right')
 
-        if report[3] == 0:      ## Up on D-pad pressed
-            return('Up')
+        if report[3] == 0:      ## up on D-pad pressed
+            return('up')
 
-        if report[3] == 4:      ## Down on D-pad pressed
-            return('Down')
+        if report[3] == 4:      ## down on D-pad pressed
+            return('down')
 
-        if report[2] == 2:      ## Start is pressed (for exiting)
-            return('Start')
+        if report[2] == 2:      ## start is pressed (for exiting)
+            return('start')
 
     def main(self):
-        ALIVE_SQUARES = INIT_WEIGHT
-        DEAD_SQUARES = 100 - INIT_WEIGHT
 
-        matrix = [[int(random.choices([0,1], weights=[DEAD_SQUARES, ALIVE_SQUARES])[0]) for _ in range(100)] for _ in range(100)] ## int()[0] is needed because .choices() returns nums in single-item list
+        matrix = self.create_grid()
 
         ## check for and initialize controller (assumes controller has 'Controller' in product_string)
         for device in hid.enumerate():
@@ -100,71 +143,135 @@ class Simulation:
                 gamepad.open(device['vendor_id'], device['product_id'])
                 gamepad.set_nonblocking(True)
                 print(f"Found gamepad named {device['product_string']}.")
-        
-        player = Pointer(0, 0)
-        player.resize()
+    
+        player = Pointer(0,0) ## player has to start at 0,0 right now
+        player.resize() ## resize player based on square scale
         looping = True
+        pause = False
+        mode = ''
+
         while looping:
 
-            report = gamepad.read(128)
+            try:
+                report = gamepad.read(128)
+                if report:
+                    con_state = self.io_check(report)
+                    match con_state:
+                        case 'right':
+                            print("right")
+                            player.move('right')
+                        case 'left':
+                            print("left")
+                            player.move('left')
+                        case 'up':
+                            print("up")
+                            player.move('up')
+                        case 'down':
+                            print("down")
+                            player.move('down')
+                        case 'A':
+                            if mode == 'create':
+                                mode = ''
+                            else:
+                                mode = 'create'
+                            print("A")
+                        case 'B':
+                            if mode == 'remove':
+                                mode = ''
+                            else:
+                                mode = 'remove'
+                            print("B")
+                        case 'start':
+                            if pause:
+                                pause = False
+                            else:
+                                pause = True
 
-            if report:
-                con_state = self.io_check(report)
-
-                match con_state:
-                    case 'Right':
-                        print("Right")
-                        player.move('Right')
-                    case 'Left':
-                        print("Left")
-                        player.move('Left')
-                    case 'Up':
-                        print("Up")
-                        player.move('Up')
-                    case 'Down':
-                        print("Down")
-                        player.move('Down')
-                    case 'A':
-                        print("A")
-                         ## add white square/1 on matrix if applicable
-                    case 'B':
-                        print("B")
-                        ## add black square/0 at pointer_loc 
+            except UnboundLocalError:
+                print("Gamepad was not found.")
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     looping = False
 
-            ## matrix = rule_check(matrix) UNCOMMENT WHEN RULE_CHECK IS COMPLETE
-            self.draw_grid(matrix)
-            player.draw(self.screen)
-            pygame.display.update()          ## update display
-            self.clock.tick(60)              ## set framerate
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP:
+                        print("Key up")
+                        player.move("up")
+                    if event.key == pygame.K_DOWN:
+                        print("Key down")
+                        player.move("down")
+                    if event.key == pygame.K_RIGHT:
+                        print("Key right")
+                        player.move("right")
+                    if event.key == pygame.K_LEFT:
+                        print("Key left")
+                        player.move("left")
+                    if event.key == pygame.K_RETURN:
+                        print("Enter key")
+                        if mode == 'create':
+                            mode = ''
+                        else:
+                            mode = 'create'
+                    if event.key == pygame.K_DELETE:
+                        print("Delete key")
+                        if mode == 'remove':
+                                mode = ''
+                        else:
+                            mode = 'remove'
+                    if event.key == pygame.K_ESCAPE:
+                        if pause:
+                                pause = False
+                        else:
+                            pause = True
 
-class Pointer(Simulation):
+            if not pause:
+                matrix = self.rule_check(matrix)
+
+            player_x, player_y = player.give_loc()
+
+            if mode == 'create' or 'remove':
+                self.draw_grid(matrix, player_x, player_y, mode, True)
+            else:
+                self.draw_grid(matrix)
+
+            player.draw(self.screen)
+            pygame.display.update() ## update display
+            self.clock.tick(FPS)     ## set framerate
+
+class Pointer:
     ''' Represents a yellow square that can be moved around the grid to place and remove squares. '''
-    def __init__(self, x, y):
+    def __init__(self, x, y, grid_loc_x=0, grid_loc_y=0):
         self.image = pygame.image.load('pointer.png')
-        self.x = x
-        self.y = y
+        self.x = x # visual x location
+        self.y = y # visual y location
+        self.grid_loc_x = grid_loc_x # x location on grid
+        self.grid_loc_y = grid_loc_y # y location on grid
 
     def resize(self):
         width = self.image.get_rect().width
         height = self.image.get_rect().height
-        self.image = pygame.transform.scale(self.image, (width*SQUARE_WIDTH, height*SQUARE_HEIGHT)) ## transforms image to fit with grid
+        self.image = pygame.transform.scale(self.image, (width*SQUARE_WIDTH, height*SQUARE_HEIGHT)) ## transforms image to fit with grid (source image must be 1 pixel)
+
+    def give_loc(self):
+        return(self.grid_loc_x, self.grid_loc_y)
 
     def draw(self, screen):
         screen.blit(self.image, (self.x, self.y))
 
     def move(self, direction):
-        if direction == 'Right':
+        if direction == 'right':
             self.x += SQUARE_WIDTH
-        if direction == 'Left':
+            self.grid_loc_x += 1
+        if direction == 'left':
             self.x -= SQUARE_WIDTH
-        if direction == 'Up':
+            self.grid_loc_x -= 1
+        if direction == 'up':
             self.y -= SQUARE_HEIGHT
-        if direction == 'Down':
+            self.grid_loc_y -= 1
+        if direction == 'down':
             self.y += SQUARE_HEIGHT
+            self.grid_loc_y += 1
 
 if __name__ == '__main__':
     sim = Simulation()
