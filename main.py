@@ -2,9 +2,9 @@ import pygame
 import hid
 import random
 
-FPS = 6
+FPS = 3
 WIN_SIZE = (750, 750) ## sets window resolution
-INIT_WEIGHT = 3 ## percent of squares that are alive on start
+INIT_WEIGHT = 2 ## percent of squares that are alive on start
 ALIVE_SQUARES = INIT_WEIGHT
 DEAD_SQUARES = 100 - INIT_WEIGHT
 SCALE_DIVISOR = 75 ## sets the number of squares wide and tall the grid is
@@ -74,19 +74,17 @@ class Simulation:
                     if row_index < len(matrix) - 1:
                         below = matrix[row_index + 1][item_index]
 
-                    ## do the changes to the matrix here based on above, left, right, and below
                     try:
                         if left and above and right and below:
-                            ## all neighbors - this doubles any crosses
-                            matrix[row_index+2][item_index] = 0
-                            matrix[row_index-2][item_index] = 1
-                            matrix[row_index][item_index+2] = 0
-                            matrix[row_index][item_index-2] = 1
+                            matrix[row_index+1][item_index] = 1
+                            matrix[row_index-1][item_index] = 0
+                            matrix[row_index][item_index+1] = 0
+                            matrix[row_index][item_index-1] = 1
 
                         elif left and right:
                             matrix[row_index+1][item_index+1] = 1
                             matrix[row_index+1][item_index-1] = 0
-                            matrix[row_index-1][item_index+1] = 1
+                            matrix[row_index-1][item_index+1] = 0
                             matrix[row_index-1][item_index-1] = 0
 
                         elif above and below:
@@ -95,8 +93,6 @@ class Simulation:
 
                         elif above or below:
                             matrix[row_index][item_index+1] = 1
-                            matrix[row_index][item_index+1] = 0
-                            matrix[row_index-1][item_index] = 1
                             matrix[row_index-1][item_index] = 1
                         else:
                             ## no neighbors causes square to die
@@ -158,16 +154,12 @@ class Simulation:
                     con_state = self.io_check(report)
                     match con_state:
                         case 'right':
-                            print("right")
                             player.move('right')
                         case 'left':
-                            print("left")
                             player.move('left')
                         case 'up':
-                            print("up")
                             player.move('up')
-                        case 'down':
-                            print("down")
+                        case 'down':  
                             player.move('down')
                         case 'A':
                             if mode == 'create':
@@ -188,7 +180,7 @@ class Simulation:
                                 pause = True
 
             except UnboundLocalError:
-                print("Gamepad was not found.")
+                pass
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -196,32 +188,26 @@ class Simulation:
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_UP:
-                        print("Key up")
                         player.move("up")
                     if event.key == pygame.K_DOWN:
-                        print("Key down")
                         player.move("down")
                     if event.key == pygame.K_RIGHT:
-                        print("Key right")
                         player.move("right")
                     if event.key == pygame.K_LEFT:
-                        print("Key left")
                         player.move("left")
                     if event.key == pygame.K_RETURN:
-                        print("Enter key")
                         if mode == 'create':
                             mode = ''
                         else:
                             mode = 'create'
                     if event.key == pygame.K_DELETE:
-                        print("Delete key")
                         if mode == 'remove':
-                                mode = ''
+                            mode = ''
                         else:
                             mode = 'remove'
                     if event.key == pygame.K_ESCAPE:
                         if pause:
-                                pause = False
+                            pause = False
                         else:
                             pause = True
 
