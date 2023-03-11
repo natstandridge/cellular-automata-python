@@ -2,12 +2,12 @@ import pygame
 import hid
 import random
 
-FPS = 3
-WIN_SIZE = (750, 750) ## sets window resolution
-INIT_WEIGHT = 2 ## percent of squares that are alive on start
+FPS = 5
+WIN_SIZE = (1000, 1000) ## sets window resolution
+INIT_WEIGHT = 5 ## percent of squares that are alive on start
 ALIVE_SQUARES = INIT_WEIGHT
 DEAD_SQUARES = 100 - INIT_WEIGHT
-SCALE_DIVISOR = 75 ## sets the number of squares wide and tall the grid is
+SCALE_DIVISOR = 100 ## sets the number of squares in a row/column (has to evenly divide into WIN_SIZE to not show empty space)
 SQUARE_WIDTH = int(WIN_SIZE[0]/SCALE_DIVISOR)
 SQUARE_HEIGHT = int(WIN_SIZE[1]/SCALE_DIVISOR)
 
@@ -17,16 +17,13 @@ class Simulation:
         self.pygame_flags = pygame.SCALED | pygame.RESIZABLE ## flags for display.set_mode
         self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((WIN_SIZE[0], WIN_SIZE[1]), self.pygame_flags, vsync=1)
+        self.matrix = [[int(random.choices([0,1], weights=[DEAD_SQUARES, ALIVE_SQUARES])[0]) for _ in range(100)] for _ in range(100)]
         pygame.init()
         pygame.display.set_caption('Cellular Automata Python')
         pygame.display.get_surface().fill((175, 175, 175))  ## draws a gray background
 
     def draw_square(self, x, y, color):
         pygame.draw.rect(self.screen, color, [x, y, SQUARE_WIDTH, SQUARE_HEIGHT])
-
-    def create_grid(self):
-        matrix = [[int(random.choices([0,1], weights=[DEAD_SQUARES, ALIVE_SQUARES])[0]) for _ in range(100)] for _ in range(100)] ## int()[0] is needed because .choices() returns nums in single-item list
-        return(matrix)
 
     def draw_grid(self, matrix, pointer_x=None, pointer_y=None, mode=None, modify=False):
         ''' Draws the grid and takes in pointer_loc to add or remove squares if modify is True and mode is passed (create or remove). '''
@@ -130,8 +127,6 @@ class Simulation:
 
     def main(self):
 
-        matrix = self.create_grid()
-
         ## check for and initialize controller (assumes controller has 'Controller' in product_string)
         for device in hid.enumerate():
             if 'controller' in device['product_string'].lower():
@@ -212,14 +207,14 @@ class Simulation:
                             pause = True
 
             if not pause:
-                matrix = self.rule_check(matrix)
+                self.matrix = self.rule_check(self.matrix)
 
             player_x, player_y = player.give_loc()
 
             if mode == 'create' or 'remove':
-                self.draw_grid(matrix, player_x, player_y, mode, True)
+                self.draw_grid(self.matrix, player_x, player_y, mode, True)
             else:
-                self.draw_grid(matrix)
+                self.draw_grid(self.matrix)
 
             player.draw(self.screen)
             pygame.display.update() ## update display
