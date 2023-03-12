@@ -11,8 +11,17 @@ SCALE_DIVISOR = 100 ## sets the number of squares in a row/column (has to evenly
 SQUARE_WIDTH = int(WIN_SIZE[0]/SCALE_DIVISOR)
 SQUARE_HEIGHT = int(WIN_SIZE[1]/SCALE_DIVISOR)
 
+## rule sets
+DEFAULT = (1,0,0,1,1,0,0,0,1,1,1,1,0)
+LIVING_VINES = (1,0,0,1,1,0,0,0,0,1,1,1,0)
+INTERLOCK = (0,1,0,1,0,0,1,0,0,1,0,1,0)
+FLAMES = (0,0,0,0,0,0,0,0,0,1,1,1,0)
+
+SET_RULES = DEFAULT ## change this to change rules
+
 class Simulation:
     ''' The game class that keeps track of the grid, the clock, and checking the grid against the rules. '''
+
     def __init__(self):
         self.pygame_flags = pygame.SCALED | pygame.RESIZABLE ## flags for display.set_mode
         self.clock = pygame.time.Clock()
@@ -28,7 +37,7 @@ class Simulation:
     def draw_grid(self, matrix, pointer_x=None, pointer_y=None, mode=None, modify=False):
         ''' Draws the grid and takes in pointer_loc to add or remove squares if modify is True and mode is passed (create or remove). '''
 
-        if modify:
+        if modify: ## handles the A/B create and remove modes
             if mode == 'create':
                 matrix[pointer_y][pointer_x] = 1
             elif mode == 'remove':
@@ -48,14 +57,8 @@ class Simulation:
                 x += SQUARE_WIDTH                            ## move right by SQUARE_WIDTH
             y += SQUARE_HEIGHT                               ## move down by SQUARE_HEIGHT
 
-    def rule_check(self, matrix):
-        ''' Check entire grid and return updated grid based on the rules. 
-
-            Rules:
-                1. Any white square not surrounded by any other white square will turn black
-                2. Any white square that has at least one other white square left, right, above, or below it will duplicate
-                3. Any square that is able to duplicate will have the extra square added at its diagonals
-        '''
+    def rule_check(self, matrix, rule_set=None):
+        ''' Check entire grid and return updated grid based on the rules. '''
         left, above, right, below = None, None, None, None ## initialize variables for neighbors
         for row_index, row in enumerate(matrix):
             if 1 not in row: ## skip any row that is all 0
@@ -73,27 +76,27 @@ class Simulation:
 
                     try:
                         if left and above and right and below:
-                            matrix[row_index+1][item_index] = 1
-                            matrix[row_index-1][item_index] = 0
-                            matrix[row_index][item_index+1] = 0
-                            matrix[row_index][item_index-1] = 1
+                            matrix[row_index+1][item_index] = rule_set[0]
+                            matrix[row_index-1][item_index] = rule_set[1]
+                            matrix[row_index][item_index+1] = rule_set[2]
+                            matrix[row_index][item_index-1] = rule_set[3]
 
                         elif left and right:
-                            matrix[row_index+1][item_index+1] = 1
-                            matrix[row_index+1][item_index-1] = 0
-                            matrix[row_index-1][item_index+1] = 0
-                            matrix[row_index-1][item_index-1] = 0
+                            matrix[row_index+1][item_index+1] = rule_set[4]
+                            matrix[row_index+1][item_index-1] = rule_set[5]
+                            matrix[row_index-1][item_index+1] = rule_set[6]
+                            matrix[row_index-1][item_index-1] = rule_set[7]
 
                         elif above and below:
-                            matrix[row_index+1][item_index+1] = 1
-                            matrix[row_index-1][item_index-1] = 1
+                            matrix[row_index+1][item_index+1] = rule_set[8]
+                            matrix[row_index-1][item_index-1] = rule_set[9]
 
                         elif above or below:
-                            matrix[row_index][item_index+1] = 1
-                            matrix[row_index-1][item_index] = 1
+                            matrix[row_index][item_index+1] = rule_set[10]
+                            matrix[row_index-1][item_index] = rule_set[11]
                         else:
                             ## no neighbors causes square to die
-                            matrix[row_index][item_index] = 0
+                            matrix[row_index][item_index] = rule_set[12]
 
                     except IndexError:
                         pass
@@ -207,19 +210,17 @@ class Simulation:
                             pause = True
 
             if not pause:
-                self.matrix = self.rule_check(self.matrix)
+                self.matrix = self.rule_check(self.matrix, SET_RULES)
 
             player_x, player_y = player.give_loc()
-
             if mode == 'create' or 'remove':
                 self.draw_grid(self.matrix, player_x, player_y, mode, True)
-            else:
-                self.draw_grid(self.matrix)
 
             player.draw(self.screen)
             pygame.display.update() ## update display
-            self.clock.tick(FPS)     ## set framerate
-
+            self.clock.tick(FPS)    ## set framerate
+            #print(self.clock.get_fps()) ## print framerate to console
+  
 class Pointer:
     ''' Represents a yellow square that can be moved around the grid to place and remove squares. '''
     def __init__(self, x, y, grid_loc_x=0, grid_loc_y=0):
